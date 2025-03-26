@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroid Sniper</title>
+    <audio id="menuMusic" src="Soundtracks/menu.mp3" loop preload="auto"></audio>
+    <audio id="gameMusic" src="Soundtracks/background.mp3" loop preload="auto"></audio>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            font-family: 'Arial', sans-serif;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #menu,
+        #gameOverScreen,
+        #creditsScreen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            color: white;
+            transition: opacity 0.5s ease;
+            opacity: 0;
+            pointer-events: none; /* Initially disable pointer events */
+        }
+
+        #menu.show,
+        #gameOverScreen.show,
+        #creditsScreen.show {
+            opacity: 1;
+            pointer-events: auto; /* Enable pointer events when shown */
+        }
+
+        #menu h1 {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            margin: 0;
+            font-size: 3em;
+        }
+
+        #menu .button-container {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        button {
+            margin: 10px;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: rgba(0, 255, 255, 0.7);
+            color: black;
+            transition: background-color 0.3s, transform 0.3s;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        button:hover {
+            background-color: rgba(0, 255, 255, 1);
+            transform: scale(1.05);
+        }
+
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 24px;
+            z-index: 3;
+            display: none;
+            white-space: nowrap; /* Prevent text from wrapping */
+        }
+
+        #backgroundCanvas {
+            z-index: 0;
+        }
+
+        .explosion-particle {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 1;
+            pointer-events: none;
+            z-index: 4;
+        }
+        #creditsScreen p {
+            font-size: 1.5em;
+            text-align: center;
+        }
+        
+        #howToPlayScreen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            color: white;
+            transition: opacity 0.5s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #howToPlayScreen.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #howToPlayScreen p {
+            font-size: 1.5em;
+            text-align: center;
+            margin: 10px;
+        }
+        #creditsScreen p {
+            font-size: 1.5em;
+            text-align: center;
+            margin: 10px;
+        }
+        #musicToggleButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 3;
+            display: block;
+        }
+        #gameOverScreen .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        #hearts {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 3;
+            display: none;
+        }
+
+        .heart {
+            width: 30px;
+            height: 30px;
+            margin-left: 5px;
+        }
+        
+    </style>
+</head>
+<body>
+    <canvas id="backgroundCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
+    <div id="menu" class="show">
+        <h1>Asteroid Sniper</h1>
+        <div class="button-container">
+            <button id="startButton">Start Game</button>
+            <button id="howToPlayButton">How to Play</button>
+            <button id="creditsButton">Credits</button>
+            <button id="exitButton">Exit</button>
+            
+        </div>
+    </div>
+    <div id="gameOverScreen">
+        <h1>Game Over</h1>
+        <div class="button-container">
+            <button id="restartButton">Restart</button>
+        </div>
+    </div>
+    <div id="creditsScreen">
+        <h1>Credits</h1>
+        <p>Game Developed by: Your Name</p>
+        <p>Assets: Free Assets</p>
+        <p>Special Thanks: Your Friends</p>
+        <button id="backToMenuButton">Back to Menu</button>
+    </div>
+    <div id="howToPlayScreen">
+        <h1>How to Play</h1>
+        <p>Use W, A, S, D to move the ship.</p>
+        <p>Use the Spacebar to shoot.</p>
+        <p>Shoot the asteroids to gain points!</p>
+        <button id="backToMenuFromHowToPlayButton">Back to Menu</button>
+    </div>
+    <div id="score">Score: 0</div>
+    <button id="musicToggleButton">Music: On</button>
+    <div id="hearts"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const backgroundCanvas = document.getElementById('backgroundCanvas');
+        const backgroundCtx = backgroundCanvas.getContext('2d');
+        const menuMusic = document.getElementById('menuMusic');
+        const gameMusic = document.getElementById('gameMusic');
+        const musicToggleButton = document.getElementById('musicToggleButton');
+        const heartsContainer = document.getElementById('hearts');
+        const heartAliveImage = new Image();
+        heartAliveImage.src = 'Pictures/heartAlive.png';
+        const heartDeadImage = new Image();
+        heartDeadImage.src = 'Pictures/heartDead.png';
+        const MAX_LIVES = 3;
+        let lives = MAX_LIVES;
+
+        const playerImage = new Image();
+        playerImage.src = 'Pictures/SpaceshipPlayer.png'; // Ensure the path is correct
+
+        // Constants
+        const PLAYER_WIDTH = 50;
+        const PLAYER_HEIGHT = 50;
+        const PLAYER_SPEED = 7;
+        const BULLET_WIDTH = 5;
+        const BULLET_HEIGHT = 10;
+        const BULLET_SPEED = 5;
+        const BULLET_COOLDOWN = 200; // Milliseconds
+        const ASTEROID_MIN_SIZE = 20;
+        const ASTEROID_MAX_SIZE = 60;
+        const ASTEROID_MIN_SPEED = 1;
+        const ASTEROID_MAX_SPEED = 3;
+        const ASTEROID_CREATION_INTERVAL = 1500; // Milliseconds
+        const STAR_MIN_SIZE = 1;
+        const STAR_MAX_SIZE = 3;
+        const STAR_MIN_SPEED = 0.5;
+        const STAR_MAX_SPEED = 1.5;
+        const STAR_CREATION_INTERVAL = 100;
+        const EXPLOSION_PARTICLES = 10;
+        const EXPLOSION_DURATION = 500; // Milliseconds
+
+        // Game Variables
+        let player;
+        let asteroids = [];
+        let bullets = [];
+        let stars = [];
+        let score = 0;
+        let gameOver = false;
+        let gameInitialized = false;
+        const keys = {};
+        let canShoot = true;
+        let asteroidInterval;
+        let animationFrameId;
+        let starInterval;
+        let isMusicPlaying = true;
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        backgroundCanvas.width = window.innerWidth;
+        backgroundCanvas.height = window.innerHeight;
+
+        player = {
+            x: canvas.width / 2 - PLAYER_WIDTH / 2,
+            y: canvas.height - PLAYER_HEIGHT - 10,
+            width: PLAYER_WIDTH,
+            height: PLAYER_HEIGHT,
+            speed: PLAYER_SPEED,
+            draw: function () {
+                // Draw the image instead of a rectangle
+                ctx.drawImage(playerImage, this.x, this.y, this.width, this.height);
+            },
+            update: function () {
+                if (keys['w'] && this.y > 0) this.y -= this.speed;
+                if (keys['s'] && this.y < canvas.height - this.height) this.y += this.speed;
+                if (keys['a'] && this.x > 0) this.x -= this.speed;
+                if (keys['d'] && this.x < canvas.width - this.width) this.x += this.speed;
+            }
+        };
+
+        function createAsteroid() {
+            const size = Math.random() * (ASTEROID_MAX_SIZE - ASTEROID_MIN_SIZE) + ASTEROID_MIN_SIZE;
+            const x = Math.random() * (canvas.width - size);
+            asteroids.push({
+                x: x,
+                y: 0,
+                width: size,
+                height: size,
+                speed: Math.random() * (ASTEROID_MAX_SPEED - ASTEROID_MIN_SPEED) + ASTEROID_MIN_SPEED,
+                draw: function () {
+                    ctx.fillStyle = 'gray';
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                },
+                update: function () {
+                    this.y += this.speed;
+                    if (this.y > canvas.height) {
+                        asteroids.splice(asteroids.indexOf(this), 1);
+                    }
+                }
+            });
+        }
+
+        function drawBullets() {
+            bullets.forEach((bullet, index) => {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                bullet.y -= bullet.speed;
+                if (bullet.y < 0) {
+                    bullets.splice(index, 1);
+                }
+            });
+        }
+
+        function checkCollisions() {
+            asteroids.forEach((asteroid, asteroidIndex) => {
+                if (
+                    asteroid.y + asteroid.height > player.y &&
+                    asteroid.y < player.y + player.height &&
+                    asteroid.x + asteroid.width > player.x &&
+                    asteroid.x < player.x + player.width
+                ) {
+                    asteroids.splice(asteroidIndex, 1);
+                    loseLife(); // Call loseLife() instead of endGame()
+                }
+
+                bullets.forEach((bullet, bulletIndex) => {
+                    if (
+                        bullet.y < asteroid.y + asteroid.height &&
+                        bullet.y + bullet.height > asteroid.y &&
+                        bullet.x < asteroid.x + asteroid.width &&
+                        bullet.x + bullet.width > asteroid.x
+                    ) {
+                        bullets.splice(bulletIndex, 1);
+                        createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
+                        asteroids.splice(asteroidIndex, 1);
+                        score++;
+                        updateScoreDisplay(); // Update the score display
+                    }
+                });
+            });
+        }
+        function createExplosion(x, y) {
+            for (let i = 0; i < EXPLOSION_PARTICLES; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('explosion-particle');
+                document.body.appendChild(particle);
+
+                const size = Math.random() * 10 + 5;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.left = `${x - size / 2}px`;
+                particle.style.top = `${y - size / 2}px`;
+
+                const color = Math.random() < 0.5 ? 'orange' : 'red';
+                particle.style.backgroundColor = color;
+
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                const dx = Math.cos(angle) * speed;
+                const dy = Math.sin(angle) * speed;
+
+                let opacity = 1;
+                const fadeInterval = setInterval(() => {
+                    opacity -= 0.1;
+                    particle.style.opacity = opacity;
+                    if (opacity <= 0) {
+                        clearInterval(fadeInterval);
+                        particle.remove();
+                    }
+                }, 50);
+
+                const moveInterval = setInterval(() => {
+                    const currentX = parseFloat(particle.style.left);
+                    const currentY = parseFloat(particle.style.top);
+                    particle.style.left = `${currentX + dx}px`;
+                    particle.style.top = `${currentY + dy}px`;
+                }, 20);
+
+                setTimeout(() => {
+                    clearInterval(moveInterval);
+                }, EXPLOSION_DURATION);
+            }
+        }
+
+        function createStar() {
+            const size = Math.random() * (STAR_MAX_SIZE - STAR_MIN_SIZE) + STAR_MIN_SIZE;
+            const x = Math.random() * canvas.width;
+            stars.push({
+                x: x,
+                y: 0,
+                size: size,
+                speed: Math.random() * (STAR_MAX_SPEED - STAR_MIN_SPEED) + STAR_MIN_SPEED,
+                draw: function () {
+                    backgroundCtx.fillStyle = 'white';
+                    backgroundCtx.beginPath();
+                    backgroundCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    backgroundCtx.fill();
+                },
+                update: function () {
+                    this.y += this.speed;
+                    if (this.y > canvas.height) {
+                        stars.splice(stars.indexOf(this), 1);
+                    }
+                }
+            });
+        }
+
+        function drawStars() {
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+        }
+        function updateScoreDisplay() {
+            document.getElementById('score').textContent = `Score: ${score}`;
+        }
+
+        function updateHeartsDisplay() {
+            heartsContainer.innerHTML = ''; // Clear existing hearts
+            for (let i = 0; i < MAX_LIVES; i++) {
+                const heart = document.createElement('img');
+                heart.classList.add('heart');
+                heart.src = i < lives ? heartAliveImage.src : heartDeadImage.src;
+                heartsContainer.appendChild(heart);
+            }
+        }
+        function loseLife() {
+            lives--;
+            updateHeartsDisplay();
+            if (lives <= 0) {
+                endGame();
+            }
+        }
+
+        function startGame() {
+            gameOver = false;
+            score = 0;
+            lives = MAX_LIVES;
+            asteroids = [];
+            bullets = [];
+            document.getElementById('menu').classList.remove('show');
+            document.getElementById('gameOverScreen').classList.remove('show');
+            document.getElementById('creditsScreen').classList.remove('show');
+            document.getElementById('howToPlayScreen').classList.remove('show');
+            document.getElementById('score').style.display = 'block';
+            document.getElementById('hearts').style.display = 'flex'; // Show hearts
+            updateHeartsDisplay();
+            updateScoreDisplay(); // Initialize the score display
+            clearInterval(asteroidInterval);
+            asteroidInterval = setInterval(createAsteroid, ASTEROID_CREATION_INTERVAL);
+            cancelAnimationFrame(animationFrameId);
+            gameLoop();
+            gameInitialized = true;
+            //Restart the star interval
+            clearInterval(starInterval);
+            stars = [];
+            starInterval = setInterval(createStar, STAR_CREATION_INTERVAL);
+            // Play game music
+            menuMusic.pause();
+            menuMusic.currentTime = 0;
+            if (isMusicPlaying) {
+                gameMusic.play();
+            }
+        }
+
+        function gameLoop() {
+            if (gameOver) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            player.update();
+            player.draw();
+            drawBullets();
+            asteroids.forEach(asteroid => {
+                asteroid.update();
+                asteroid.draw();
+            });
+            checkCollisions();
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            score = 0;
+            asteroids = [];
+            bullets = [];
+            lives = MAX_LIVES;
+            updateHeartsDisplay();
+            player.x = canvas.width / 2 - PLAYER_WIDTH / 2;
+            player.y = canvas.height - PLAYER_HEIGHT - 10;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            backgroundCtx.clearRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+            gameInitialized = false;
+            updateScoreDisplay();
+            // Stop game music and play menu music
+            gameMusic.pause();
+            gameMusic.currentTime = 0;
+            if (isMusicPlaying) {
+                menuMusic.play();
+            }
+            // Show the menu
+            document.getElementById('menu').classList.add('show');
+            document.getElementById('gameOverScreen').classList.remove('show');
+            document.getElementById('score').style.display = 'none';
+            clearInterval(asteroidInterval);
+            cancelAnimationFrame(animationFrameId);
+        }
+
+        // Event Listeners
+        document.getElementById('startButton').addEventListener('click', startGame);
+        document.getElementById('restartButton').addEventListener('click', () => {
+            resetGame();
+            startGame();
+        });
+
+
+        function endGame() {
+            gameOver = true;
+            document.getElementById('gameOverScreen').classList.add('show');
+            document.getElementById('score').style.display = 'none';
+            document.getElementById('hearts').style.display = 'none'; // Hide hearts
+            clearInterval(asteroidInterval);
+            cancelAnimationFrame(animationFrameId);
+            asteroids = [];
+            bullets = [];
+            // Stop game music
+            gameMusic.pause();
+            gameMusic.currentTime = 0;
+        }
+        // Add the return to menu button to the game over screen
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const returnToMenuButton = document.createElement('button');
+        returnToMenuButton.id = 'returnToMenuButton';
+        returnToMenuButton.textContent = 'Return to Menu';
+        returnToMenuButton.style.marginTop = '10px'; // Add some space above the button
+        gameOverScreen.appendChild(returnToMenuButton);
+        
+        // Event Listener for the Return to Menu button
+        document.getElementById('returnToMenuButton').addEventListener('click', () => {
+            resetGame();
+        });
+
+        // Event Listeners
+        document.getElementById('startButton').addEventListener('click', startGame);
+        document.getElementById('restartButton').addEventListener('click', () => {
+            resetGame();
+            startGame();
+        });
+        document.getElementById('creditsButton').addEventListener('click', () => {
+            document.getElementById('menu').classList.remove('show');
+            document.getElementById('creditsScreen').classList.add('show');
+        });
+        document.getElementById('backToMenuButton').addEventListener('click', () => {
+            document.getElementById('creditsScreen').classList.remove('show');
+            document.getElementById('menu').classList.add('show');
+        });
+        document.getElementById('howToPlayButton').addEventListener('click', () => {
+            document.getElementById('menu').classList.remove('show');
+            document.getElementById('howToPlayScreen').classList.add('show');
+        });
+        document.getElementById('backToMenuFromHowToPlayButton').addEventListener('click', () => {
+            document.getElementById('howToPlayScreen').classList.remove('show');
+            document.getElementById('menu').classList.add('show');
+        });
+        document.getElementById('exitButton').addEventListener('click', () => {
+            window.close();
+        });
+        document.addEventListener('keydown', (event) => {
+            keys[event.key] = true;
+            if (event.key === ' ') {
+                if (canShoot && gameInitialized) {
+                    bullets.push({
+                        x: player.x + player.width / 2 - BULLET_WIDTH / 2,
+                        y: player.y,
+                        width: BULLET_WIDTH,
+                        height: BULLET_HEIGHT,
+                        speed: BULLET_SPEED
+                    });
+                    canShoot = false;
+                    setTimeout(() => {
+                        canShoot = true;
+                    }, BULLET_COOLDOWN);
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            keys[event.key] = false;
+        });
+
+        musicToggleButton.addEventListener('click', () => {
+            isMusicPlaying = !isMusicPlaying;
+            if (isMusicPlaying) {
+                musicToggleButton.textContent = 'Music: On';
+                if (gameInitialized) {
+                    gameMusic.play();
+                } else {
+                    menuMusic.play();
+                }
+            } else {
+                musicToggleButton.textContent = 'Music: Off';
+                menuMusic.pause();
+                gameMusic.pause();
+            }
+        });
+
+        // Initialize star creation
+        starInterval = setInterval(createStar, STAR_CREATION_INTERVAL);
+
+        // Draw stars initially
+        function initialDrawStars() {
+            backgroundCtx.clearRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+            drawStars();
+            requestAnimationFrame(initialDrawStars);
+        }
+        initialDrawStars();
+        // Play menu music on load
+        updateHeartsDisplay();
+    </script>
+
