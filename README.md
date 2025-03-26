@@ -13,3 +13,5 @@ Note:
 
 
   https://gooberheads6297.github.io/Asteroid-Sniper/
+
+  # For now I would advise downloading it locally 
