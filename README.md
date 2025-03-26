@@ -10,3 +10,6 @@ Thanks to A.I intergration into VSCode it made my dream of making this game into
 Note:
 
   When using the game through the online link the heartDead.png for some reason doesn't load. I think it may be due to the Github Pages because the script references the file properly.
+
+
+  https://gooberheads6297.github.io/Asteroid-Sniper/
